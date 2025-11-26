@@ -1,0 +1,19 @@
+# Process Hollowing Demo (Harmless)
+$target = "C:\Windows\System32\notepad.exe"
+$si = New-Object System.Diagnostics.ProcessStartInfo
+$si.FileName = $target
+$si.UseShellExecute = $false
+
+# Start process suspended
+$pi = [System.Diagnostics.Process]::Start($si)
+Start-Sleep -Milliseconds 500
+
+# Get handle
+$handle = $pi.Handle
+
+# Allocate memory in target process
+$payload = [System.Text.Encoding]::ASCII.GetBytes("Hello from Hollowing!")
+$addr = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($payload.Length)
+[System.Runtime.InteropServices.Marshal]::Copy($payload, 0, $addr, $payload.Length)
+
+Write-Host "Injected payload (simulation only)."
